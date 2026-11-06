@@ -1,0 +1,12 @@
+# Core (what the prototype uses today)
+flask>=3.0
+numpy
+pillow
+opencv-python-headless
+scikit-learn
+pytest
+# Optional upgrades (not required to run the demo)
+# ultralytics        # YOLO detector: see scripts/train_yolo.py
+# sentence-transformers  # multilingual embeddings for duplicate detection and text classification
+# faiss-cpu          # vector search once complaint volume grows
+# requests           # only for live WhatsApp sending (set WHATSAPP_TOKEN / WHATSAPP_PHONE_ID)

@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NammaFixtory — Fix Today. Prevent Tomorrow.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Noto+Sans+Tamil:wght@400;600&family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet.css" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'">
+<style>
+:root{
+  --concrete:#F3F6F4; --panel:#FFFFFF; --ink:#1E2A32; --asphalt:#2B3640; --sign:#0E6B50; --sign-dark:#0A4F3B;
+  --kerb:#F0B323; --brick:#B8381F; --mist:#DCE3E0; --muted:#5C6B73; --amber-bg:#FCF1D3; --green-bg:#DDF0E8;
+  --brick-bg:#F8E1DC; --slate-bg:#E4E9EC;
+  --r:6px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--concrete);color:var(--ink);font:400 16px/1.55 "Noto Sans","Noto Sans Tamil",system-ui,sans-serif}
+h1,h2,h3{font-family:Archivo,"Noto Sans Tamil",system-ui,sans-serif;font-stretch:108%;line-height:1.15;margin:0 0 .5rem;letter-spacing:-.01em}
+h1{font-size:clamp(1.6rem,4.5vw,2.3rem);font-weight:700}
+h2{font-size:1.3rem;font-weight:700}
+h3{font-size:1.02rem;font-weight:700}
+p{margin:0 0 .75rem;max-width:68ch}
+a{color:var(--sign-dark)}
+:focus-visible{outline:3px solid var(--kerb);outline-offset:2px}
+.sr{position:absolute;left:-9999px}
+
+/* header: highway sign */
+header.top{background:var(--sign);color:#fff;position:sticky;top:0;z-index:50}
+header.top .bar{max-width:1240px;margin:0 auto;padding:.6rem 1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.brand{font:700 1.35rem Archivo,sans-serif;font-stretch:112%;letter-spacing:-.01em;color:#fff;text-decoration:none}
+.brand small{display:block;font:400 .72rem "Noto Sans",sans-serif;opacity:.85;letter-spacing:0;margin-top:-2px}
+nav{display:flex;gap:.25rem;flex-wrap:wrap;margin-left:auto}
+nav button{background:none;border:0;color:#fff;font:600 .93rem "Noto Sans",sans-serif;padding:.5rem .8rem;border-radius:var(--r);cursor:pointer}
+nav button[aria-current="page"]{background:rgba(255,255,255,.18);box-shadow:inset 0 -3px 0 var(--kerb)}
+nav button:hover{background:rgba(255,255,255,.12)}
+.kerb{height:7px;background:repeating-linear-gradient(-45deg,var(--kerb) 0 12px,var(--asphalt) 12px 24px)}
+.sample{background:var(--amber-bg);color:var(--ink);border-bottom:1px solid #E6CF8E;font-size:.85rem;padding:.35rem 1rem;text-align:center}
+.minimap{position:relative;overflow:hidden;touch-action:none;user-select:none}
+.mm-pop{position:absolute;background:#fff;border:1px solid #B9C5C0;border-radius:8px;padding:.5rem .7rem;font-size:.85rem;box-shadow:0 4px 14px rgba(0,0,0,.18);max-width:240px;z-index:5}
+.mm-ctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:4px;z-index:4}
+.mm-ctl button{width:34px;height:34px;border-radius:8px;border:1px solid #B9C5C0;background:#fff;font-size:1.1rem;cursor:pointer}
+.mm-note{position:absolute;left:10px;bottom:8px;font-size:.72rem;color:#5C6B73;z-index:3}
+.nomap{background:var(--slate-bg);border:1px dashed #9AA7AE;border-radius:var(--r);padding:1rem;color:var(--muted)}
+
+main{max-width:1240px;margin:0 auto;padding:1.25rem 1rem 4rem}
+.view{display:none}.view.on{display:block}
+.narrow{max-width:720px;margin:0 auto}
+.lede{color:var(--muted);font-size:1.02rem}
+
+.panel{background:var(--panel);border:1px solid var(--mist);border-radius:var(--r);padding:1rem 1.1rem}
+.panel+.panel{margin-top:1rem}
+label{display:block;font-weight:600;font-size:.92rem;margin:.9rem 0 .25rem}
+.hint{font-weight:400;color:var(--muted);font-size:.84rem}
+input[type=text],input[type=password],input[type=search],select,textarea{width:100%;font:inherit;padding:.6rem .7rem;border:1px solid #B9C5C0;border-radius:var(--r);background:#fff;color:var(--ink)}
+textarea{min-height:96px;resize:vertical}
+input[type=file]{width:100%;font:inherit}
+.row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+.row>*{flex:0 0 auto}.row>.grow{flex:1 1 200px}
+.btn{font:600 .95rem "Noto Sans",sans-serif;border-radius:var(--r);border:1px solid var(--sign);background:var(--sign);color:#fff;padding:.6rem 1rem;cursor:pointer;min-height:44px}
+.btn:hover{background:var(--sign-dark)}
+.btn.alt{background:#fff;color:var(--sign-dark)}
+.btn.alt:hover{background:var(--green-bg)}
+.btn.warn{background:#fff;border-color:var(--brick);color:var(--brick)}
+.btn.small{min-height:34px;padding:.3rem .65rem;font-size:.86rem}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.check{display:flex;gap:.6rem;align-items:flex-start;font-weight:400;margin-top:.8rem}
+.check input{margin-top:.3rem;width:18px;height:18px}
+
+#pick{height:240px;border:1px solid #B9C5C0;border-radius:var(--r);margin-top:.4rem}
+.loc-note{font-size:.85rem;color:var(--muted);margin-top:.3rem}
+
+.badge{display:inline-block;font:600 .76rem "Noto Sans",sans-serif;padding:.12rem .5rem;border-radius:99px;background:var(--slate-bg);color:var(--asphalt);white-space:nowrap}
+.b-open{background:var(--amber-bg);color:#6B4B00}.b-under_review{background:var(--slate-bg)}.b-in_repair{background:#D9ECF2;color:#124A5D}
+.b-resolved{background:var(--green-bg);color:var(--sign-dark)}.b-rejected{background:#ECECEC;color:#555}
+.b-High{background:var(--brick-bg);color:var(--brick)}.b-Medium{background:var(--amber-bg);color:#6B4B00}.b-Low{background:var(--green-bg);color:var(--sign-dark)}
+.b-flag{background:var(--brick);color:#fff}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+
+/* result */
+.ref{font:700 1.7rem Archivo,sans-serif;font-stretch:112%;letter-spacing:.02em;color:var(--sign-dark)}
+.callout{border-left:5px solid var(--kerb);background:var(--amber-bg);padding:.7rem .9rem;border-radius:0 var(--r) var(--r) 0;margin:.8rem 0}
+.callout.red{border-color:var(--brick);background:var(--brick-bg)}
+.callout.green{border-color:var(--sign);background:var(--green-bg)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:.25rem 1rem;font-size:.92rem;margin:.5rem 0}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.fac{display:grid;grid-template-columns:130px 1fr 54px;gap:.5rem;align-items:center;font-size:.85rem;margin:.28rem 0}
+.fac .bar{height:8px;background:var(--mist);border-radius:4px;overflow:hidden}.fac .bar i{display:block;height:100%;background:var(--sign)}
+.fac small{grid-column:2/4;color:var(--muted);margin-top:-.2rem}
+
+/* the memorable thing: road timeline */
+.road{position:relative;margin:.6rem 0 .2rem;padding-left:46px}
+.road::before{content:"";position:absolute;left:14px;top:4px;bottom:4px;width:18px;background:var(--asphalt);border-radius:3px}
+.road::after{content:"";position:absolute;left:22px;top:8px;bottom:8px;width:2px;background:repeating-linear-gradient(to bottom,var(--kerb) 0 9px,transparent 9px 18px)}
+.ev{position:relative;padding:.35rem 0 .7rem}
+.ev .dot{position:absolute;left:-39px;top:.55rem;width:18px;height:18px;display:grid;place-items:center}
+.ev .dot i{display:block;width:12px;height:12px;background:#fff;border:3px solid var(--kerb);border-radius:50%}
+.ev.repair_completed .dot i{border-radius:2px;border-color:#7FD1B0;background:var(--sign)}
+.ev.repair_started .dot i{border-radius:2px;border-color:#7FD1B0;background:#fff}
+.ev.duplicate_report .dot i{width:8px;height:8px;border-width:2px;border-color:#9AA7AE}
+.ev.recurrence .dot i{width:18px;height:18px;border-radius:2px;transform:rotate(45deg);background:var(--brick);border:3px solid #fff;outline:2px solid var(--brick)}
+.ev.recurrence{background:var(--brick-bg);margin-left:-8px;padding-left:8px;border-radius:var(--r)}
+.ev.recurrence .dot{left:-31px}
+.ev .when{font-size:.8rem;color:var(--muted)}
+.ev.recurrence .t{font-weight:600;color:var(--brick)}
+
+/* officer */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;margin-bottom:1rem}
+.stat{background:#fff;border:1px solid var(--mist);border-radius:var(--r);padding:.6rem .8rem}
+.stat b{display:block;font:700 1.7rem Archivo,sans-serif;font-stretch:108%;line-height:1.1}
+.stat span{font-size:.82rem;color:var(--muted)}
+.stat.alert b{color:var(--brick)}
+.split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:1rem;align-items:start}
+@media(max-width:960px){.split{grid-template-columns:1fr}}
+.tblwrap{overflow:auto;max-height:70vh;border:1px solid var(--mist);border-radius:var(--r);background:#fff}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th{position:sticky;top:0;background:var(--asphalt);color:#fff;text-align:left;font-weight:600;padding:.5rem .6rem;white-space:nowrap}
+td{padding:.5rem .6rem;border-top:1px solid var(--mist);vertical-align:top}
+tbody tr{cursor:pointer}tbody tr:hover{background:#F0F7F4}tbody tr.sel{background:var(--green-bg)}
+.filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem}.filters>*{flex:1 1 130px;min-width:0}
+.bars .brow{display:grid;grid-template-columns:150px 1fr 30px;gap:.5rem;align-items:center;font-size:.85rem;margin:.22rem 0}
+.bars .brow i{display:block;height:10px;background:var(--sign);border-radius:2px}
+.cols{display:flex;align-items:flex-end;gap:6px;height:70px;margin-top:.5rem}
+.cols div{flex:1;background:var(--sign);border-radius:2px 2px 0 0;position:relative;min-height:3px}
+.cols div span{position:absolute;bottom:-1.3rem;left:50%;transform:translateX(-50%);font-size:.68rem;color:var(--muted);white-space:nowrap}
+.cols{margin-bottom:1.5rem}
+.imgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem;margin:.5rem 0}
+.imgs figure{margin:0}.imgs img{width:100%;border-radius:var(--r);border:1px solid var(--mist);display:block}
+.imgs figcaption{font-size:.78rem;color:var(--muted)}
+#bigmap{height:min(72vh,640px);border:1px solid var(--mist);border-radius:var(--r)}
+.legend{display:flex;gap:1rem;flex-wrap:wrap;font-size:.84rem;margin:.5rem 0}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:.3rem;vertical-align:-1px}
+
+/* demo steps */
+.steps{list-style:none;margin:0;padding:0}
+.step{border:1px solid var(--mist);background:#fff;border-radius:var(--r);padding:.8rem 1rem;margin-bottom:.7rem}
+.step.done{border-color:#9ED3BD}
+.step .head{display:flex;gap:.8rem;align-items:center;flex-wrap:wrap}
+.step .head h3{margin:0;flex:1 1 220px}
+.step .out{margin-top:.7rem}
+.toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);background:var(--asphalt);color:#fff;padding:.6rem 1rem;border-radius:var(--r);z-index:99;max-width:90vw}
+.toast.err{background:var(--brick)}
+@media(prefers-reduced-motion:no-preference){.toast{animation:pop .2s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
+.chat{background:#E9E4D8;border:1px solid var(--mist);border-radius:var(--r);padding:.8rem;height:340px;overflow:auto;display:flex;flex-direction:column;gap:.45rem}
+.chat .m{max-width:82%;padding:.45rem .7rem;border-radius:12px;font-size:.92rem;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.chat .me{align-self:flex-end;background:#D7F0DA}.chat .bot{align-self:flex-start;background:#fff}
+.chat .m small{display:block;color:var(--muted);font-size:.72rem;margin-top:.15rem}
+.held{border:1px dashed var(--mist);border-radius:var(--r);padding:.6rem .8rem;color:var(--muted);font-size:.85rem;background:#fff}
+.pv{font-size:.76rem;color:var(--muted)}
+footer{max-width:1240px;margin:0 auto;padding:0 1rem 2rem;color:var(--muted);font-size:.82rem}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="#report">NammaFixtory<small>Fix Today. Prevent Tomorrow.</small></a>
+    <nav aria-label="Main">
+      <button data-v="report">Report a problem</button>
+      <button data-v="track">Track a report</button>
+      <button data-v="map">Map</button>
+      <button data-v="wa">WhatsApp</button>
+      <button data-v="officer">Officer dashboard</button>
+      <button data-v="demo">Guided demo</button>
+    </nav>
+  </div>
+  <div class="kerb" aria-hidden="true"></div>
+  <div class="sample">Sample data: photos, locations and complaints in this prototype are synthetic and only illustrate the workflow.</div>
+</header>
+
+<main>
+<!-- REPORT -->
+<section id="v-report" class="view narrow">
+  <h1>Report a road, drain or garbage problem</h1>
+  <p class="lede">Add a photo and say what you see, in Tamil or English. We find the right department and check whether this spot has been fixed before.</p>
+  <form id="rform" class="panel" autocomplete="off">
+    <label for="photo">Photo <span class="hint">(a clear photo helps officers act faster)</span></label>
+    <input id="photo" type="file" accept="image/*" capture="environment">
+    <label for="desc">What is the problem?</label>
+    <textarea id="desc" placeholder="Example: Large pothole near the bus stop / பேருந்து நிறுத்தம் அருகில் பெரிய பள்ளம்"></textarea>
+    <div class="row" style="margin-top:.4rem">
+      <button type="button" class="btn alt small" id="mic">Speak instead</button>
+      <select id="miclang" aria-label="Speech language" style="width:auto"><option value="ta-IN">தமிழ்</option><option value="en-IN">English</option></select>
+      <span class="hint" id="micnote">Voice input works in browsers that support speech recognition (experimental).</span>
+    </div>
+    <label for="cat">Problem type <span class="hint">(leave on automatic and we suggest one)</span></label>
+    <select id="cat"><option value="">Detect automatically</option></select>
+    <label>Location</label>
+    <div class="row"><button type="button" class="btn alt small" id="gps">Use my current location</button><span class="hint">or tap the map to place the pin</span></div>
+    <div id="pick" role="application" aria-label="Map to choose the location"></div>
+    <div id="manual" style="display:none" class="nomap">
+      <p style="margin:0 0 .5rem">The street map could not load, so pick a nearby landmark or type the coordinates (you can copy them from any maps app).</p>
+      <label for="quick" class="sr">Choose a nearby landmark</label><select id="quick" style="margin-bottom:.5rem"><option value="">Choose a nearby landmark…</option></select>
+      <div class="row"><div class="grow"><label for="mlat" class="sr">Latitude</label><input id="mlat" type="text" inputmode="decimal" placeholder="Latitude, e.g. 13.0827"></div>
+      <div class="grow"><label for="mlon" class="sr">Longitude</label><input id="mlon" type="text" inputmode="decimal" placeholder="Longitude, e.g. 80.2707"></div></div>
+    </div>
+    <div class="loc-note" id="locnote">No pin placed yet.</div>
+    <label for="locText">Landmark <span class="hint">(optional)</span></label>
+    <input id="locText" type="text" placeholder="Near the bus stop, opposite the temple">
+    <label class="check"><input type="checkbox" id="consent"> <span>I agree to share my name and phone number with the department so they can reach me. We never show them publicly. <span class="hint">(optional)</span></span></label>
+    <div id="contactBox" style="display:none">
+      <label for="name">Name</label><input id="name" type="text">
+      <label for="contact">Phone number</label><input id="contact" type="text" inputmode="tel">
+    </div>
+    <div class="row" style="margin-top:1.1rem"><button class="btn" id="submitBtn" type="submit">Send report</button><span class="hint">Our AI makes suggestions; an officer reviews every report.</span></div>
+  </form>
+  <div id="rresult"></div>
+</section>
+
+<!-- TRACK -->
+<section id="v-track" class="view narrow">
+  <h1>Track a report</h1>
+  <p class="lede">Enter the reference number you received.</p>
+  <form id="tform" class="panel"><div class="row"><div class="grow"><label for="tref" class="sr">Reference number</label><input id="tref" type="search" placeholder="NFX-261105-AB12"></div><button class="btn" type="submit">Find report</button></div></form>
+  <div id="tresult"></div>
+</section>
+
+<!-- MAP -->
+<section id="v-map" class="view">
+  <h1>Reports and repeat-failure locations</h1>
+  <p class="lede">Each ring is a piece of road or drain we keep a history for. Red rings have failed again after a repair.</p>
+  <div class="legend" id="legend"></div>
+  <div id="bigmap"></div>
+</section>
+
+<!-- WHATSAPP SIMULATOR -->
+<section id="v-wa" class="view narrow">
+  <h1>Report through WhatsApp</h1>
+  <p class="lede">Send a photo, a short description and your location in a chat. This page is a <b>simulator</b>: it runs the same conversation logic as the WhatsApp Business webhook, but nothing is sent to WhatsApp. Live messaging needs Business API access.</p>
+  <div class="panel">
+    <div class="row"><div class="grow"><label for="wasender">Pretend phone number <span class="hint">(only a salted hash is kept, and only until the report is filed)</span></label><input id="wasender" type="text" value="919800000000"></div></div>
+    <div class="chat" id="wachat" role="log" aria-live="polite" aria-label="Chat with NammaFixtory"></div>
+    <div class="row" style="margin-top:.6rem">
+      <div class="grow"><label for="watext" class="sr">Message</label><input id="watext" type="text" placeholder="Type in Tamil or English, e.g. pothole near the bus stop"></div>
+      <button class="btn" id="wasend" type="button">Send</button>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <label class="btn alt small" for="wafile" style="margin:0;cursor:pointer">Attach photo</label><input id="wafile" type="file" accept="image/*" class="sr">
+      <button class="btn alt small" id="waloc" type="button">Share demo location</button>
+      <button class="btn alt small" id="wahelp" type="button">Say hi</button>
+      <span class="hint" id="wafilename"></span>
+    </div>
+    <p class="hint">Try: send a description, then share the location. Later send <code>status NFX-…</code> with your reference number.</p>
+  </div>
+</section>
+
+<!-- OFFICER -->
+<section id="v-officer" class="view">
+  <div id="olock" class="panel narrow" style="margin-top:2rem">
+    <h1>Officer sign-in</h1>
+    <p class="lede">Only authorised municipal officers can see contact details, exact locations and repair controls.</p>
+    <form id="oform"><label for="okey">Officer key</label><input id="okey" type="password" autocomplete="off">
+      <p class="hint" style="margin-top:.4rem">Prototype key: <code>demo123</code>. Set your own with the <code>NAMMAFIXTORY_OFFICER_KEY</code> environment variable.</p>
+      <button class="btn" type="submit">Open dashboard</button></form>
+  </div>
+  <div id="odash" style="display:none">
+    <div class="row" style="justify-content:space-between;margin-bottom:.6rem"><h1 style="margin:0">Municipal dashboard</h1>
+      <div class="row"><button class="btn alt small" id="dlcsv">Download maintenance report (CSV)</button><button class="btn alt small" id="osignout">Sign out</button></div></div>
+    <div class="stats" id="stats"></div>
+    <div class="split">
+      <div>
+        <h2>Complaint queue <span class="hint" style="font-weight:400">(highest priority first)</span></h2>
+        <div class="filters">
+          <input type="search" id="fq" placeholder="Search text or reference" aria-label="Search">
+          <select id="fcat" aria-label="Category"><option value="">All categories</option></select>
+          <select id="fward" aria-label="Ward"><option value="">All wards</option></select>
+          <select id="fstatus" aria-label="Status"><option value="">Any status</option><option value="open">Open</option><option value="under_review">Under review</option><option value="in_repair">In repair</option><option value="resolved">Resolved</option><option value="rejected">Rejected</option></select>
+        </div>
+        <div class="tblwrap"><table><thead><tr><th>Ref</th><th>Issue</th><th>Priority</th><th>Status</th><th>Ward</th></tr></thead><tbody id="qbody"></tbody></table></div>
+        <div class="panel" style="margin-top:1rem"><h3>Complaints by type</h3><div class="bars" id="bycat"></div><h3 style="margin-top:.9rem">Complaints by ward</h3><div class="bars" id="byward"></div><h3 style="margin-top:.9rem">Complaints by month</h3><div class="cols" id="bymonth"></div></div>
+      </div>
+      <div id="detail"><div class="panel"><h2>Select a complaint</h2><p class="muted">Choose a row to see the AI analysis, the location's repair history and the repair controls.</p><h3>Locations that keep failing</h3><div id="recur"></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO -->
+<section id="v-demo" class="view narrow">
+  <h1>Guided demo: a pothole that comes back</h1>
+  <p class="lede">Five steps show the full life of one pothole. Photos are generated illustrations and the dates are simulated, so the whole story runs in a minute.</p>
+  <div class="row" style="margin-bottom:1rem"><button class="btn warn small" id="dreset">Reset demo data</button><button class="btn small" id="drunall">Run all steps</button></div>
+  <ol class="steps" id="steps"></ol>
+</section>
+</main>
+<footer>NammaFixtory is a prototype. AI output is a suggestion for human review: it never certifies a repair, a safety condition or a government decision.</footer>
+
+<script src="minimap.js"></script>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=(s,r=document)=>r.querySelector(s);
+const fmtD=t=>t?new Date(t).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
+const STATUS={open:'Open',under_review:'Under review',in_repair:'In repair',resolved:'Resolved',rejected:'Rejected'};
+const PRIV={blurred:'faces/plates blurred automatically',none_found:'checked, none found',officer_cleared:'cleared by an officer',officer_blurred:'blurred by an officer',synthetic:'sample photo (no real people)',detector_unavailable:'HELD: automatic check unavailable, officers only',unchecked:'HELD: not checked yet, officers only'};
+const EVRES={consistent_pending_confirmation:'Looks repaired — officer to confirm',needs_review:'Needs an officer’s review',insufficient:'Not enough evidence'};
+let META=null, KEY=sessionStorage.getItem('nfx_key')||'';
+
+function toast(msg,err){const t=document.createElement('div');t.className='toast'+(err?' err':'');t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3800)}
+async function api(path,opts={}){
+  opts.headers=Object.assign({},opts.headers||{}); if(KEY) opts.headers['X-Officer-Key']=KEY;
+  const r=await fetch(path,opts); let j=null; try{j=await r.json()}catch(e){}
+  if(!r.ok){const e=new Error((j&&j.error)||('Request failed ('+r.status+')'));e.status=r.status;throw e}
+  return j;
+}
+const post=(p,body)=>api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+
+/* ---------- photos: privacy gate helpers ---------- */
+const HELD_HTML='<div class="held">Photo held for privacy review. An officer checks it for faces and number plates before it can be shown publicly.</div>';
+function imgTag(name,alt,cap){ const n=encodeURIComponent(name);
+  const im=KEY?`<img data-secure="${n}" alt="${esc(alt)}">`:`<img alt="${esc(alt)}" src="/uploads/${n}">`;
+  return `<figure>${im}${cap?`<figcaption>${esc(cap)}</figcaption>`:''}</figure>`; }
+async function hydrateSecure(root){ for(const im of (root||document).querySelectorAll('img[data-secure]')){
+  const n=im.dataset.secure; delete im.dataset.secure;
+  try{ const r=await fetch('/uploads/'+n,{headers:{'X-Officer-Key':KEY}}); if(!r.ok) throw 0; im.src=URL.createObjectURL(await r.blob()) }
+  catch(e){ im.replaceWith(Object.assign(document.createElement('div'),{className:'held',textContent:'Photo unavailable'})) } } }
+new MutationObserver(()=>hydrateSecure()).observe(document.body,{childList:true,subtree:true});
+document.addEventListener('error',e=>{ const t=e.target; if(t&&t.tagName==='IMG'&&(t.src||'').includes('/uploads/')){ const d=document.createElement('div'); d.className='held'; d.textContent='Photo held for privacy review.'; t.replaceWith(d) } },true);
+
+/* ---------- routing ---------- */
+const views=['report','track','map','wa','officer','demo'];
+function show(v){ if(!views.includes(v)) v='report';
+  views.forEach(x=>{$('#v-'+x).classList.toggle('on',x===v)});
+  document.querySelectorAll('nav button').forEach(b=>{ if(b.dataset.v===v) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  if(location.hash!=='#'+v) history.replaceState(null,'','#'+v);
+  if(v==='report') initPick(); if(v==='map') loadMap(); if(v==='officer') officerInit(); if(v==='demo') renderSteps(); if(v==='wa') waInit();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.v)));
+window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+
+/* ---------- report ---------- */
+let pickMap=null,pickMarker=null,pos=null;
+const HAS_MAP=()=>typeof L!=='undefined';
+function setPos(lat,lon,fly){pos={lat,lon};
+  if(pickMap){ if(pickMarker) pickMarker.setLatLng([lat,lon]); else pickMarker=L.marker([lat,lon]).addTo(pickMap); if(fly) pickMap.setView([lat,lon],17) }
+  $('#locnote').textContent='Location set to '+lat.toFixed(5)+', '+lon.toFixed(5)+(pickMap?'. Move the pin by tapping the map.':'.')}
+function manualCoords(){ const a=parseFloat($('#mlat').value),b=parseFloat($('#mlon').value); if(isFinite(a)&&isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180) setPos(a,b,false) }
+$('#mlat').addEventListener('input',manualCoords); $('#mlon').addEventListener('input',manualCoords);
+async function fillQuick(){ const q=$('#quick'); if(q.options.length>1) return; try{ (await api('/api/sensitive-places')).forEach(p=>q.add(new Option(p.name+' ('+p.kind+')',p.lat+','+p.lon))) }catch(e){} }
+$('#quick').addEventListener('change',e=>{ if(!e.target.value) return; const [a,b]=e.target.value.split(',').map(Number); $('#mlat').value=a; $('#mlon').value=b; setPos(a,b,false) });
+function initPick(){ if(!HAS_MAP()){ $('#pick').style.display='none'; $('#manual').style.display='block'; fillQuick(); return }
+  if(pickMap){setTimeout(()=>pickMap.invalidateSize(),50);return}
+  pickMap=L.map('pick').setView([13.0827,80.2707],13);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(pickMap);
+  pickMap.on('click',e=>setPos(e.latlng.lat,e.latlng.lng,false)); }
+$('#gps').addEventListener('click',()=>{ if(!navigator.geolocation) return toast('This browser cannot share your location. Tap the map instead.',true);
+  navigator.geolocation.getCurrentPosition(p=>setPos(p.coords.latitude,p.coords.longitude,true),()=>toast('Location permission was denied. Tap the map to place the pin.',true),{enableHighAccuracy:true,timeout:10000}) });
+$('#consent').addEventListener('change',e=>{$('#contactBox').style.display=e.target.checked?'block':'none'});
+(function mic(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; const b=$('#mic');
+  if(!SR){b.disabled=true;$('#micnote').textContent='Voice input is not supported in this browser. Please type your report.';return}
+  let rec=null,on=false; b.addEventListener('click',()=>{ if(on){rec.stop();return}
+    rec=new SR(); rec.lang=$('#miclang').value; rec.interimResults=false;
+    rec.onresult=e=>{const t=Array.from(e.results).map(r=>r[0].transcript).join(' ');$('#desc').value=($('#desc').value+' '+t).trim()};
+    rec.onend=()=>{on=false;b.textContent='Speak instead'}; rec.onerror=()=>toast('Could not hear anything. Try again or type your report.',true);
+    on=true;b.textContent='Stop listening'; rec.start() }) })();
+
+$('#rform').addEventListener('submit',async e=>{ e.preventDefault();
+  if(!pos) return toast('Place the pin on the map or use your current location first.',true);
+  const f=new FormData(); const file=$('#photo').files[0]; if(file) f.append('image',file);
+  f.append('description',$('#desc').value); f.append('category',$('#cat').value); f.append('lat',pos.lat); f.append('lon',pos.lon);
+  f.append('location_text',$('#locText').value);
+  if($('#consent').checked){f.append('consent','1');f.append('name',$('#name').value);f.append('contact',$('#contact').value)}
+  const btn=$('#submitBtn'); btn.disabled=true; btn.textContent='Sending…';
+  try{ const r=await api('/api/complaints',{method:'POST',body:f}); renderResult(r,$('#rresult')); $('#rresult').scrollIntoView({behavior:'smooth'}); }
+  catch(err){toast(err.message,true)} finally{btn.disabled=false;btn.textContent='Send report'} });
+
+function factors(list){return list.map(f=>`<div class="fac"><span>${esc(f.factor.replace('_',' '))}</span><span class="bar"><i style="width:${Math.round(f.value*100)}%"></i></span><b>${f.points}/${f.weight}</b><small>${esc(f.why)}</small></div>`).join('')}
+function renderResult(r,el){
+  const ai=r.image_analysis, dup=r.duplicate;
+  let h=`<div class="panel"><p class="muted small" style="margin:0">Your reference number</p><div class="ref">${esc(r.ref)}</div>
+  <p>Sent to <b>${esc(r.department)}</b>. Keep this number to follow progress.</p>
+  ${r.photo_public===false?'<p class="hint">Your photo is held until an officer checks it for faces and number plates. Only officers can see it until then.</p>':''}
+  <dl class="kv"><dt>Problem type</dt><dd><b>${esc(r.category_label)}</b> <span class="muted small">(${{citizen:'chosen by you',image:'suggested from your photo',nlp:'suggested from your words',officer:'set by an officer'}[r.category_source]||''})</span></dd>
+  <dt>Language</dt><dd>${esc({ta:'Tamil',en:'English','ta-en':'Tamil + English',unknown:'—'}[r.language]||r.language)}</dd>
+  ${ai?`<dt>Photo check</dt><dd>${esc(ai.category.replace('_',' '))}, ${Math.round(ai.confidence*100)}% confidence <span class="muted small">(${esc(ai.detector)})</span>${(ai.quality.issues||[]).length?'<br><span class="small" style="color:var(--brick)">'+esc(ai.quality.issues.join('; '))+' — a clearer photo helps.</span>':''}</dd>`:''}
+  <dt>Priority</dt><dd><span class="badge b-${r.priority.level}">${r.priority.level}</span> ${r.priority.score}/100</dd></dl>`;
+  if(r.recurrence_detected) h+=`<div class="callout red"><b>This problem has returned.</b> This location was repaired before and has now failed again. It is flagged for inspection.</div>`;
+  else if(r.history.recurrences>0) h+=`<div class="callout red">This location has failed ${r.history.recurrences} time(s) after repair.</div>`;
+  if(dup) h+=`<div class="callout"><b>This looks like a report we already have</b> (${esc(dup.matches_ref)}, ${Math.round(dup.score*100)}% match, ${dup.distance_m} m away). We keep both reports and link them so the problem is counted once. An officer confirms the link.</div>`;
+  h+=`<details><summary>Why this priority?</summary><div style="margin-top:.5rem">${factors(r.priority.factors)}<p class="hint">A recommendation only. Emergencies follow official procedures.</p></div></details>
+  <p class="hint" style="margin-top:.8rem">${esc(r.human_review_note)}</p></div>`;
+  el.innerHTML=h;
+}
+
+/* ---------- track ---------- */
+function timelineHTML(tl){ if(!tl||!tl.length) return '<p class="muted">No history yet.</p>';
+  return '<div class="road">'+tl.map(e=>`<div class="ev ${esc(e.type)}"><span class="dot"><i></i></span><div class="when">${fmtD(e.ts)}</div><div class="t">${esc(e.text)}</div></div>`).join('')+'</div>'; }
+async function loadTrack(ref){ const el=$('#tresult'); el.innerHTML='';
+  try{ const c=await api('/api/complaints/'+encodeURIComponent(ref.trim())); const a=c.asset;
+    const fixed=c.status==='resolved';
+    let h=`<div class="panel"><div class="row" style="justify-content:space-between"><div><div class="ref" style="font-size:1.3rem">${esc(c.ref)}</div><div class="muted small">Reported ${fmtD(c.created_at)} · ${esc(c.category_label)}</div></div><span class="badge b-${esc(c.status)}">${esc(STATUS[c.status]||c.status)}</span></div>
+    <p style="margin-top:.7rem">${esc(c.description||'')}</p>
+    ${c.images.length?`<div class="imgs">${c.images.map(i=>imgTag(i,'Photo you submitted')).join('')}</div>`:''}${c.images_held?HELD_HTML:''}
+    ${c.duplicate_of_ref?`<div class="callout">Linked to ${esc(c.duplicate_of_ref)}, the same problem reported earlier.</div>`:''}
+    ${a&&a.inspection_flag?`<div class="callout red">This location keeps failing. Flagged for engineering inspection: ${esc(a.flag_reasons.join('; '))}.</div>`:''}
+    ${fixed?`<h3>Is it fixed?</h3><div class="row"><button class="btn small" data-fb="1">Yes, it is fixed</button><button class="btn warn small" data-fb="0">No, still a problem</button></div><p class="hint" id="fbmsg"></p>`:''}</div>
+    <div class="panel"><h2>Updates</h2>${c.notifications.map(n=>`<p class="small"><b>${fmtD(n.created_at)}</b> · ${esc(n.message)}</p>`).join('')||'<p class="muted">No updates yet.</p>'}</div>`;
+    el.innerHTML=h;
+    el.querySelectorAll('[data-fb]').forEach(b=>b.addEventListener('click',async()=>{ try{await post('/api/complaints/'+encodeURIComponent(c.ref)+'/feedback',{resolved:b.dataset.fb==='1'});$('#fbmsg').textContent='Thank you. Your answer helps officers check the repair.'}catch(err){toast(err.message,true)} }));
+    if(a){ const full=await api('/api/assets/'+a.asset_id); const p=document.createElement('div'); p.className='panel'; p.innerHTML='<h2>History of this spot</h2>'+timelineHTML(full.timeline); el.appendChild(p) }
+  }catch(err){ el.innerHTML=`<div class="callout red">${esc(err.status===404?'We could not find that reference number. Check it and try again.':err.message)}</div>` } }
+$('#tform').addEventListener('submit',e=>{e.preventDefault(); if($('#tref').value.trim()) loadTrack($('#tref').value)});
+
+
+/* ---------- whatsapp simulator ---------- */
+let waReady=false,waFile=null;
+function waBubble(t,me,small){ const b=document.createElement('div'); b.className='m '+(me?'me':'bot'); b.textContent=t; if(small){const sm=document.createElement('small'); sm.textContent=small; b.appendChild(sm)} const c=$('#wachat'); c.appendChild(b); c.scrollTop=c.scrollHeight }
+async function waSend(form,mine){ if(mine) waBubble(mine,true);
+  try{ const r=await fetch('/api/channels/simulate',{method:'POST',body:form}); const j=await r.json(); if(!r.ok) throw new Error(j.error||'Failed');
+    j.replies.forEach(t=>waBubble(t,false)); if(j.ref) waBubble('Filed: '+j.ref+' (see it under Track a report or the officer dashboard)',false,'simulator note') }
+  catch(e){ waBubble('Error: '+e.message,false) } }
+function waForm(extra){ const f=new FormData(); f.append('sender',$('#wasender').value||'sim-user'); Object.entries(extra).forEach(([k,v])=>f.append(k,v)); return f }
+function waInit(){ if(waReady) return; waReady=true; waBubble('Simulator ready. Say hi, or send a description and share a location.',false,'simulator note');
+  const doText=()=>{ const t=$('#watext').value.trim(); const file=waFile; if(!t&&!file) return; $('#watext').value='';
+    if(file){ const f=waForm({type:'image',text:t}); f.append('image',file); waFile=null; $('#wafile').value=''; $('#wafilename').textContent=''; waSend(f,'📷 '+(file.name)+(t?'\n'+t:'')) }
+    else waSend(waForm({type:'text',text:t}),t) };
+  $('#wasend').addEventListener('click',doText);
+  $('#watext').addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();doText()} });
+  $('#wafile').addEventListener('change',e=>{ waFile=e.target.files[0]||null; $('#wafilename').textContent=waFile?waFile.name+' (press Send)':'' });
+  $('#waloc').addEventListener('click',async()=>{ let l={lat:13.0827,lon:80.2707}; try{ l=await api('/api/demo/location') }catch(e){}
+    waSend(waForm({type:'location',lat:l.lat,lon:l.lon}),'📍 Location: '+l.lat.toFixed(4)+', '+l.lon.toFixed(4)) });
+  $('#wahelp').addEventListener('click',()=>waSend(waForm({type:'text',text:'hi'}),'hi')) }
+
+/* ---------- map ---------- */
+let bigmap=null,layers=[];
+const SC={open:'#C98A00',under_review:'#5C6B73',in_repair:'#1B7FA0',resolved:'#0E6B50',rejected:'#999'};
+let mini=null;
+async function loadMap(){
+  const d=await api('/api/map'); const places=await api('/api/sensitive-places');
+  const legend=Object.keys(STATUS).filter(k=>k!=='rejected').map(k=>`<span><i class="sw" style="background:${SC[k]}"></i>${STATUS[k]}</span>`).join('')+
+   '<span><i class="sw" style="background:#fff;border:3px solid #B8381F"></i>Failed again after repair</span><span><i class="sw" style="background:#F0B323;opacity:.5"></i>Hotspot</span><span>Pin = school or hospital (sample)</span>';
+  $('#legend').innerHTML=legend;
+  const assetHtml=a=>`<b>${esc(a.asset_code)}</b><br>${esc(a.ward||'')}<br>Failed again after repair: <b>${a.recurrences}</b>${a.inspection_flag?'<br><b style="color:#B8381F">Flagged for inspection</b>':''}<br>Risk: ${esc(a.risk_level)}`;
+  const compHtml=c=>`<b>${esc(c.label)}</b><br>${esc(STATUS[c.status]||c.status)} · ${fmtD(c.created_at)}${c.duplicate_of?'<br>Linked duplicate':''}`;
+  if(!HAS_MAP()){
+    if(!window.MiniMap){ $('#bigmap').innerHTML='<div class="nomap">The map could not load.</div>'; return }
+    if(!mini) mini=new MiniMap($('#bigmap')); mini.clear();
+    d.assets.forEach(a=>{ const bad=a.recurrences>0; mini.add('circle',a.lat,a.lon,{radiusM:bad?30:18,minPx:bad?13:9,color:bad?'#B8381F':'#2B3640',weight:bad?4:2,fill:bad?'#B8381F':'#2B3640',fillOpacity:bad?.15:.05,dash:bad?'':'4 4',html:assetHtml(a),tip:a.asset_code}) });
+    d.hotspots.forEach(h=>mini.add('circle',h.lat,h.lon,{radiusM:h.radius_m*1.4,minPx:20,color:'#F0B323',weight:2,fill:'#F0B323',fillOpacity:.18,html:'Hotspot: '+esc(h.size)+' open reports close together'}));
+    d.complaints.forEach(c=>mini.add('dot',c.lat,c.lon,{r:6,fill:SC[c.status]||'#555',html:compHtml(c),tip:c.label}));
+    places.forEach(p=>mini.add('pin',p.lat,p.lon,{fill:'#5C6B73',label:p.name,tip:p.name+' ('+p.kind+')',html:esc(p.name)+' ('+esc(p.kind)+')'}));
+    mini.fit(); mini.render(); return }
+  if(!bigmap){ bigmap=L.map('bigmap').setView([13.04,80.24],12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(bigmap); }
+  setTimeout(()=>bigmap.invalidateSize(),50);
+  layers.forEach(l=>l.remove()); layers=[];
+  d.assets.forEach(a=>{ const bad=a.recurrences>0; const c=L.circle([a.lat,a.lon],{radius:bad?30:18,color:bad?'#B8381F':'#2B3640',weight:bad?4:2,fillOpacity:bad?.15:.05,dashArray:bad?null:'4 4'}).addTo(bigmap);
+    c.bindPopup(assetHtml(a)); layers.push(c) });
+  d.hotspots.forEach(h=>{ const c=L.circle([h.lat,h.lon],{radius:h.radius_m*1.4,color:'#F0B323',weight:2,fillColor:'#F0B323',fillOpacity:.18}).addTo(bigmap); c.bindTooltip('Hotspot: '+h.size+' open reports close together'); layers.push(c) });
+  d.complaints.forEach(c=>{ const m=L.circleMarker([c.lat,c.lon],{radius:6,color:'#fff',weight:1.5,fillColor:SC[c.status]||'#555',fillOpacity:.95}).addTo(bigmap);
+    m.bindPopup(compHtml(c)); layers.push(m) });
+  places.forEach(p=>{ const m=L.marker([p.lat,p.lon],{title:p.name,opacity:.8}).addTo(bigmap); m.bindTooltip(p.name+' ('+p.kind+')'); layers.push(m) });
+}
+
+/* ---------- officer ---------- */
+let SELECTED=null;
+function officerInit(){ if(KEY){ openDash() } else { $('#olock').style.display='block'; $('#odash').style.display='none' } }
+$('#oform').addEventListener('submit',async e=>{ e.preventDefault(); KEY=$('#okey').value; try{ await api('/api/dashboard'); sessionStorage.setItem('nfx_key',KEY); openDash() }catch(err){ KEY=''; toast(err.status===401?'That key is not valid.':err.message,true) } });
+$('#osignout').addEventListener('click',()=>{KEY='';sessionStorage.removeItem('nfx_key');$('#okey').value='';officerInit()});
+$('#dlcsv').addEventListener('click',async()=>{ try{const r=await fetch('/api/export/maintenance-report',{headers:{'X-Officer-Key':KEY}});const b=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='maintenance_report.csv';a.click()}catch(e){toast('Download failed',true)} });
+async function openDash(){ $('#olock').style.display='none'; $('#odash').style.display='block';
+  try{ const d=await api('/api/dashboard'); renderStats(d); await loadQueue(); }catch(err){ if(err.status===401){KEY='';sessionStorage.removeItem('nfx_key');officerInit()} else toast(err.message,true) } }
+function bars(el,rows,key,labelKey){ const max=Math.max(1,...rows.map(r=>r.n)); el.innerHTML=rows.map(r=>`<div class="brow"><span>${esc(r[labelKey||key])}</span><span><i style="width:${r.n/max*100}%"></i></span><b>${r.n}</b></div>`).join('')||'<p class="muted">No data.</p>' }
+function renderStats(d){ const s=d.by_status||{};
+  $('#stats').innerHTML=[['Total complaints',d.total],['Open',s.open||0],['In repair',s.in_repair||0],['Resolved',s.resolved||0],['Linked duplicates',d.duplicates],['Repair photos to confirm',d.evidence_pending]].map(x=>`<div class="stat"><b>${x[1]}</b><span>${x[0]}</span></div>`).join('')+
+   `<div class="stat alert"><b>${d.inspection_flags}</b><span>Locations flagged for inspection</span></div><div class="stat alert"><b>${d.high_risk_assets}</b><span>High-risk locations</span></div>`;
+  bars($('#bycat'),d.by_category,'label'); bars($('#byward'),d.by_ward,'ward');
+  const mx=Math.max(1,...d.monthly.map(m=>m.n)); $('#bymonth').innerHTML=d.monthly.map(m=>`<div style="height:${m.n/mx*100}%"><span>${esc(m.month.slice(2))} (${m.n})</span></div>`).join('');
+  $('#recur').innerHTML=d.recurring_assets.length?d.recurring_assets.map(a=>`<p class="small" style="margin:.3rem 0"><a href="#" data-asset="${a.asset_id}"><b>${esc(a.asset_code)}</b></a> · ${esc(a.ward||'')} · failed again <b>${a.recurrences}×</b> <span class="badge b-${a.risk.level}">${a.risk.level} risk</span></p>`).join(''):'<p class="muted small">None yet.</p>';
+  $('#recur').querySelectorAll('[data-asset]').forEach(l=>l.addEventListener('click',e=>{e.preventDefault();showAsset(+l.dataset.asset)}));
+  const cats=$('#fcat'); if(cats.options.length<2){ (META.categories).forEach(c=>cats.add(new Option(c.label,c.key))); }
+  const w=$('#fward'); if(w.options.length<2) d.by_ward.forEach(x=>w.add(new Option(x.ward,x.ward)));
+}
+async function loadQueue(){ const q=new URLSearchParams(); [['q','fq'],['category','fcat'],['ward','fward'],['status','fstatus']].forEach(([k,id])=>{const v=$('#'+id).value; if(v) q.set(k,v)});
+  const rows=await api('/api/queue?'+q.toString());
+  $('#qbody').innerHTML=rows.map(r=>`<tr data-ref="${esc(r.ref)}" class="${SELECTED===r.ref?'sel':''}"><td><b>${esc(r.ref.slice(4))}</b>${r.duplicate_of?'<br><span class="badge">linked</span>':''}</td><td>${esc(r.label)}<br><span class="muted small">${esc((r.description||'').slice(0,60))}</span></td><td><span class="badge b-${r.priority_level}">${r.priority_level||'—'}</span> ${r.priority_score??''}</td><td><span class="badge b-${esc(r.status)}">${esc(STATUS[r.status]||r.status)}</span></td><td class="small">${esc(r.ward||'')}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">No complaints match these filters.</td></tr>';
+  $('#qbody').querySelectorAll('tr[data-ref]').forEach(tr=>tr.addEventListener('click',()=>showComplaint(tr.dataset.ref))); }
+['fcat','fward','fstatus'].forEach(id=>$('#'+id).addEventListener('change',loadQueue)); let qt; $('#fq').addEventListener('input',()=>{clearTimeout(qt);qt=setTimeout(loadQueue,250)});
+
+async function showComplaint(ref){ SELECTED=ref; loadQueue();
+  const c=await api('/api/complaints/'+encodeURIComponent(ref)); const d=$('#detail');
+  const ai=c.ai, pr=c.priority;
+  let h=`<div class="panel"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">${esc(c.ref)}</h2><span class="muted small">${fmtD(c.created_at)} · ${esc(c.channel)} · ${esc(c.language)}</span></div><span class="badge b-${esc(c.status)}">${esc(STATUS[c.status]||c.status)}</span></div>
+   <p style="margin-top:.6rem">${esc(c.description||'(no description)')}</p>
+   ${c.images.length?`<div class="imgs">${c.images.map(i=>imgTag(i,'Citizen photo','Citizen photo')).join('')}</div>`:''}
+   ${(c.image_info||[]).map(i=>`<p class="pv">Photo privacy: <b>${esc(PRIV[i.privacy]||i.privacy)}</b> ${i.public?'':`<button class="btn alt small" data-clear="${esc(i.name)}">I checked it: no faces or plates</button>`}</p>`).join('')}
+   <dl class="kv"><dt>Type</dt><dd>${esc(c.category_label)} <span class="muted small">(${esc(c.category_source)})</span></dd><dt>Location</dt><dd>${c.lat.toFixed(5)}, ${c.lon.toFixed(5)} ${esc(c.location_text||'')}</dd>
+   ${ai?`<dt>AI photo check</dt><dd>${esc(ai.predicted_category.replace('_',' '))}, ${Math.round(ai.confidence*100)}% <span class="muted small">(${esc(ai.detector)}, ${esc(ai.human_review)})</span></dd>`:''}</dl>
+   <div class="row"><select id="recat" aria-label="Correct the category" style="width:auto">${META.categories.map(x=>`<option value="${x.key}" ${x.key===c.category?'selected':''}>${esc(x.label)}</option>`).join('')}</select>
+     <button class="btn alt small" id="ai-ok">AI result is right</button><button class="btn alt small" id="ai-fix">Correct the type</button></div>
+   ${c.duplicate_of?`<div class="callout"><b>Possible duplicate of ${esc(c.duplicate_of_ref||'')}</b> (${esc(c.duplicate_state)}). Both citizen reports are kept.<div class="row" style="margin-top:.5rem"><button class="btn small" id="dup-y">Confirm duplicate</button><button class="btn warn small" id="dup-n">Not a duplicate</button></div></div>`:''}
+   <h3 style="margin-top:.9rem">Priority <span class="badge b-${pr?pr.level:''}">${pr?pr.level:''}</span> ${pr?pr.score:''}/100</h3>${pr?factors(pr.factors):''}
+   <div class="row" style="margin-top:.7rem"><button class="btn alt small" data-st="under_review">Mark under review</button><button class="btn alt small" data-st="in_repair">Mark in repair</button><button class="btn warn small" data-st="rejected">Reject</button></div></div>
+   <div class="panel" id="assetbox"></div>`;
+  d.innerHTML=h;
+  d.querySelectorAll('[data-st]').forEach(b=>b.addEventListener('click',async()=>{await post('/api/complaints/'+encodeURIComponent(ref)+'/status',{status:b.dataset.st});toast('Status updated');showComplaint(ref)}));
+  d.querySelectorAll('[data-clear]').forEach(b=>b.addEventListener('click',async()=>{await post('/api/images/'+encodeURIComponent(b.dataset.clear)+'/privacy',{action:'clear'});toast('Photo released: it can now be shown publicly');showComplaint(ref)}));
+  $('#ai-ok').addEventListener('click',async()=>{await post('/api/complaints/'+encodeURIComponent(ref)+'/ai-review',{});toast('Marked as confirmed');showComplaint(ref)});
+  $('#ai-fix').addEventListener('click',async()=>{await post('/api/complaints/'+encodeURIComponent(ref)+'/ai-review',{category:$('#recat').value});toast('Type corrected');showComplaint(ref);loadQueue()});
+  if($('#dup-y')){$('#dup-y').addEventListener('click',async()=>{await post('/api/complaints/'+encodeURIComponent(ref)+'/duplicate',{confirm:true});toast('Duplicate confirmed');showComplaint(ref)});
+    $('#dup-n').addEventListener('click',async()=>{await post('/api/complaints/'+encodeURIComponent(ref)+'/duplicate',{confirm:false});toast('Link removed');showComplaint(ref);loadQueue()})}
+  if(c.asset_id) renderAsset(c.asset_id,$('#assetbox'));
+}
+async function showAsset(id){ const d=$('#detail'); d.innerHTML='<div class="panel" id="assetbox"></div>'; renderAsset(id,$('#assetbox')); d.scrollIntoView({behavior:'smooth'}) }
+async function renderAsset(id,el){ const a=await api('/api/assets/'+id);
+  let h=`<h2>${esc(a.asset_code)} <span class="muted small" style="font-weight:400">${esc(a.family)} · ${esc(a.ward||'')}</span></h2>
+  <div class="row" style="margin-bottom:.4rem"><span class="badge b-${a.risk.level}">${a.risk.level} risk · ${a.risk.score}/100</span>${a.inspection_flag?'<span class="badge b-flag">Flagged for inspection</span>':''}<span class="muted small">${a.reports_total} report(s) · ${a.episodes} damage episode(s) · ${a.repairs_completed} repair(s)</span></div>`;
+  if(a.inspection_flag) h+=`<div class="callout red"><b>Why flagged:</b> ${esc(a.flag_reasons.join('; '))}.</div>`;
+  if(a.possible_causes.length) h+=`<h3>Possible causes to check</h3><ul class="small" style="margin:.2rem 0 .6rem;padding-left:1.1rem">${a.possible_causes.map(c=>`<li>${esc(c.hypothesis)} <span class="muted">— ${esc(c.evidence)}</span></li>`).join('')}</ul><p class="hint">These are hypotheses for engineers to test, not findings.</p>`;
+  h+=`<details><summary>How the risk score is built</summary><ul class="small">${a.risk.factors.map(f=>`<li>+${f.points}: ${esc(f.why)}</li>`).join('')||'<li>No risk factors yet.</li>'}</ul><p class="hint">${esc(a.risk.disclaimer)}</p></details>
+  <h3 style="margin-top:.9rem">History of this location</h3>${timelineHTML(a.timeline)}`;
+  if(a.evidence.length){ h+='<h3>Repair evidence</h3>'+a.evidence.map(e=>{const m=e.ai_detail.metrics||{}; return `<div class="callout ${e.ai_result==='consistent_pending_confirmation'?'green':''}"><b>${esc(EVRES[e.ai_result]||e.ai_result)}</b> <span class="badge">${esc(e.review_status.replace('_',' '))}</span>
+    <div class="imgs">${e.before_image?imgTag(e.before_image,'Before repair','Before'):''}${e.after_image?imgTag(e.after_image,'After repair','After'):''}</div>
+    <p class="small" style="margin:.2rem 0">${esc((e.ai_detail.reasons||[]).join('; '))}</p><p class="hint">Photos alone never certify a repair. Check on site before you confirm.</p>
+    ${e.review_status==='awaiting_officer'?`<div class="row"><button class="btn small" data-ev="${e.evidence_id}" data-c="1">Confirm repair is complete</button><button class="btn warn small" data-ev="${e.evidence_id}" data-c="0">Reject evidence</button></div>`:''}</div>`}).join('') }
+  h+=`<h3 style="margin-top:.9rem">Record a repair</h3><form id="rep"><label for="after">After-repair photo <span class="hint">(optional, we compare it with the original)</span></label><input id="after" type="file" accept="image/*"><label for="notes">Notes</label><input id="notes" type="text" placeholder="Cold-mix patch, 2 m²"><div class="row" style="margin-top:.7rem"><button class="btn" type="submit">Mark repair complete</button></div></form>`;
+  el.innerHTML=h;
+  el.querySelectorAll('[data-ev]').forEach(b=>b.addEventListener('click',async()=>{await post('/api/evidence/'+b.dataset.ev+'/review',{confirm:b.dataset.c==='1'});toast('Review saved');renderAsset(id,el);openDashStats()}));
+  $('#rep').addEventListener('submit',async e=>{e.preventDefault(); const f=new FormData(); f.append('officer','Officer'); f.append('notes',$('#notes').value); if($('#after').files[0]) f.append('image',$('#after').files[0]);
+    try{ const r=await api('/api/assets/'+id+'/repair',{method:'POST',body:f}); toast('Repair recorded'+(r.evidence?': '+(EVRES[r.evidence.result]||''):'')); renderAsset(id,el); openDashStats(); loadQueue() }catch(err){toast(err.message,true)} });
+}
+async function openDashStats(){ try{renderStats(await api('/api/dashboard'))}catch(e){} }
+
+/* ---------- demo ---------- */
+const STEPS=[
+ ['Citizen A reports a pothole','A photo and a short description arrive. The system reads the photo, places the report at a piece of road and scores its priority.'],
+ ['Citizen B reports the same pothole','Different words, different photo, a few metres away. The system links the two reports instead of counting two potholes.'],
+ ['An officer records the repair','The officer marks the repair complete and uploads an after photo. The system compares it with the original.'],
+ ['The officer checks the AI evidence review','The AI only recommends. A person confirms the repair after looking at the evidence.'],
+ ['Damage returns','A new report arrives from the same spot after the repair. The history shows a repeat failure and the location is flagged for inspection.']];
+const done=new Set();
+function renderSteps(){ $('#steps').innerHTML=STEPS.map((s,i)=>`<li class="step ${done.has(i+1)?'done':''}" id="st${i+1}"><div class="head"><h3>Step ${i+1}. ${esc(s[0])}</h3><button class="btn small" data-run="${i+1}">${done.has(i+1)?'Run again':'Run this step'}</button></div><p class="muted small" style="margin:.4rem 0 0">${esc(s[1])}</p><div class="out"></div></li>`).join('');
+  document.querySelectorAll('[data-run]').forEach(b=>b.addEventListener('click',()=>runStep(+b.dataset.run))) }
+async function runStep(n){ const out=$('#st'+n+' .out'); out.innerHTML='<p class="muted">Working…</p>';
+  try{ const r=await api('/api/demo/step/'+n,{method:'POST'}); done.add(n); $('#st'+n).classList.add('done'); $('#st'+n+' button').textContent='Run again';
+    let h=''; const x=r.result;
+    if(n===1||n===2){ h=`<div class="imgs"><figure><img alt="Synthetic pothole photo" src="/uploads/${n===1?'demo_a':'demo_b'}.jpg"><figcaption>Illustrative photo</figcaption></figure></div>`; renderResultInto(out,x,h) ; return }
+    if(n===3){ const ev=x.evidence; h=`<div class="imgs"><figure><img alt="Before" src="/uploads/demo_a.jpg"><figcaption>Before</figcaption></figure><figure><img alt="After" src="/uploads/demo_after.jpg"><figcaption>After</figcaption></figure></div><div class="callout ${ev&&ev.result==='consistent_pending_confirmation'?'green':''}"><b>${esc(ev?EVRES[ev.result]:'No evidence')}</b><br>${ev?esc(ev.reasons.join('; ')):''}</div><p class="hint">Reports at this spot are now marked resolved.</p>` }
+    if(n===4){ h=`<div class="callout green">Evidence confirmed by the officer after an on-site check.</div><div class="panel">${timelineHTML(x.asset.timeline)}</div>` }
+    if(n===5){ renderResultInto(out,x,`<div class="imgs"><figure><img alt="Synthetic pothole photo" src="/uploads/demo_back.jpg"><figcaption>Illustrative photo</figcaption></figure></div>`,true); return }
+    out.innerHTML=h;
+  }catch(err){ out.innerHTML=`<div class="callout red">${esc(err.message)}</div>` } }
+function renderResultInto(out,x,pre,withTimeline){ const tmp=document.createElement('div'); renderResult(x,tmp); out.innerHTML=pre+tmp.innerHTML+(withTimeline&&x.asset?`<div class="panel" style="margin-top:.8rem"><h3>History of this spot</h3>${timelineHTML(x.asset.timeline)}${x.asset.possible_causes.length?'<h3>Possible causes to check</h3><ul class="small">'+x.asset.possible_causes.map(c=>`<li>${esc(c.hypothesis)} — <span class="muted">${esc(c.evidence)}</span></li>`).join('')+'</ul>':''}</div>`:'') }
+$('#dreset').addEventListener('click',async()=>{ if(!confirm('This reloads the sample data and removes the demo reports. Continue?')) return; await api('/api/demo/reset',{method:'POST'}); done.clear(); renderSteps(); toast('Demo data reset') });
+$('#drunall').addEventListener('click',async()=>{ for(let i=1;i<=5;i++){ await runStep(i) } $('#st5').scrollIntoView({behavior:'smooth'}) });
+
+/* ---------- boot ---------- */
+window.__boot=async function(){ META=await api('/api/meta'); const cat=$('#cat'); META.categories.forEach(c=>cat.add(new Option(c.label,c.key)));
+  show(location.hash.slice(1)||'report') };
+</script>
+<script>
+/* Load Leaflet from the local vendor folder, then the CDN; the app still works without it. */
+(function(){ function load(src,ok,fail){var s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=fail;document.head.appendChild(s)}
+  load('vendor/leaflet.js',window.__boot,function(){ load('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',window.__boot,window.__boot) }) })();
+</script>
+</body>
+</html>
